@@ -29,6 +29,18 @@ Built natively with Python and Tkinter, this tool allows you to completely force
 * 🌗 **Modern Dark Mode:** A sleek, eye-friendly dark UI[cite: 1].
 * 📦 **One-Click Installer:** Smart `build.sh` script that compiles the tool locally and places it neatly in your Start Menu under the "Wine" category[cite: 1].
 
+## ⚠️ Disclaimer
+
+This project is provided "as-is" and is considered untested. I am not responsible for any possible failures of the program, system instability, or data loss that may occur while using this tool.
+
+## 🛠️ Prerequisites
+
+To ensure all features work perfectly, make sure you have the following packages installed on your system[cite: 1]:
+
+**For BigLinux / Arch Linux / Manjaro:**
+```bash
+sudo pacman -S python python-tkinter icoutils
+
 ---
 
 ## 🇧🇷 Versão em Português (PT-BR)
@@ -52,12 +64,14 @@ Construído nativamente com Python e Tkinter, esta ferramenta permite que você 
 * 🌗 **Modo Escuro Moderno:** Uma interface escura elegante e agradável aos olhos[cite: 1].
 * 📦 **Instalador de Um Clique:** Script `build.sh` inteligente que compila a ferramenta localmente e a coloca de forma organizada no seu Menu Iniciar sob a categoria "Wine"[cite: 1].
 
----
+## ⚠️ Aviso
 
-## 🛠️ Prerequisites
+Este projeto é fornecido "como está" e é considerado não testado. Não me responsabilizo por possíveis falhas do programa, instabilidade do sistema ou perda de dados que possam ocorrer ao usar esta ferramenta.
 
-To ensure all features work perfectly, make sure you have the following packages installed on your system[cite: 1]:
+## 🛠️ Pré-requisitos
 
-**For BigLinux / Arch Linux / Manjaro:**
+Para garantir que todos os recursos funcionem perfeitamente, certifique-se de ter os seguintes pacotes instalados em seu sistema: 
+
+**Para BigLinux / Arch Linux / Manjaro:**
 ```bash
 sudo pacman -S python python-tkinter icoutils
