@@ -1,21 +1,24 @@
 #!/bin/bash
 
-EXEC_NAME="wine-linux-shortcut-maker-z"
-LOCAL_OUTPUT_NAME="Wine Linux Shortcut Maker Z"
+EXEC_NAME="wine-linux-uninstaller-z"
+LOCAL_OUTPUT_NAME="Wine Linux Uninstaller Z"
 BIN_DIR="$HOME/.local/bin"
 APP_DIR="$HOME/.local/share/applications"
 ICON_DIR="$HOME/.local/share/icons"
 DESKTOP_DIR=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
-DESKTOP_FILE_NAME="wine-linux-shortcut-maker-z.desktop"
 
 echo "⚙️ Iniciando a construção..."
 
-if [ -f "Wine_Linux_Shortcut_Maker_Z.py" ]; then
-    SCRIPT_NAME="Wine_Linux_Shortcut_Maker_Z.py"
-elif [ -f "wine_linux_shortcut_maker_z.py" ]; then
-    SCRIPT_NAME="wine_linux_shortcut_maker_z.py"
+# FIXED: Now correctly detects the hyphenated filename
+if [ -f "wine-linux-uninstaller-z.py" ]; then
+    SCRIPT_NAME="wine-linux-uninstaller-z.py"
+elif [ -f "Wine_Linux_Uninstaller_Z.py" ]; then
+    SCRIPT_NAME="Wine_Linux_Uninstaller_Z.py"
+elif [ -f "wine_linux_uninstaller_z.py" ]; then
+    SCRIPT_NAME="wine_linux_uninstaller_z.py"
 else
     echo "❌ Erro: O arquivo do script Python não foi encontrado."
+    echo "Certifique-se de que o arquivo se chama 'wine-linux-uninstaller-z.py'."
     exit 1
 fi
 
@@ -34,6 +37,7 @@ cat > "$ICON_DIR/$EXEC_NAME.svg" << 'SVGEOF'
   <rect x="4" y="4" width="82" height="116" rx="10" fill="none" stroke="#E53935" stroke-width="8"/>
 </svg>
 SVGEOF
+ICON_SETTING="$ICON_DIR/$EXEC_NAME.svg"
 # ─────────────────────────────────────────────────────────────────────────────
 
 echo "📦 Gerando executável..."
@@ -43,28 +47,38 @@ chmod +x "./$LOCAL_OUTPUT_NAME"
 cp "./$LOCAL_OUTPUT_NAME" "$BIN_DIR/$EXEC_NAME"
 
 echo "🖥️ Adicionando ao Menu do Sistema..."
-cat > "$APP_DIR/$DESKTOP_FILE_NAME" << DESKTOPEOF
-[Desktop Entry]
-Name=Wine Linux Shortcut Maker Z
-Comment=Gera atalhos configurados
+DESKTOP_ENTRY_CONTENT="[Desktop Entry]
+Name=Wine Linux Program Uninstaller Z
+Comment=Remova programas Windows via atalho ou .exe
 Exec=$BIN_DIR/$EXEC_NAME
-Icon=$ICON_DIR/$EXEC_NAME.svg
+Icon=$ICON_SETTING
 Terminal=false
 Type=Application
 Categories=Utility;Wine;System;
-DESKTOPEOF
-chmod +x "$APP_DIR/$DESKTOP_FILE_NAME"
+"
+
+echo "$DESKTOP_ENTRY_CONTENT" > "$APP_DIR/$EXEC_NAME.desktop"
+chmod +x "$APP_DIR/$EXEC_NAME.desktop"
 
 echo "🏠 Criando atalho na Área de Trabalho..."
-cp "$APP_DIR/$DESKTOP_FILE_NAME" "$DESKTOP_DIR/$DESKTOP_FILE_NAME"
-chmod 755 "$DESKTOP_DIR/$DESKTOP_FILE_NAME"
+DESKTOP_FILE_PATH="$DESKTOP_DIR/$EXEC_NAME.desktop"
+echo "$DESKTOP_ENTRY_CONTENT" > "$DESKTOP_FILE_PATH"
+chmod 755 "$DESKTOP_FILE_PATH"
 
 if command -v gio &> /dev/null; then
-    gio set "$DESKTOP_DIR/$DESKTOP_FILE_NAME" metadata::trusted true 2>/dev/null
+    gio set "$DESKTOP_FILE_PATH" metadata::trusted true 2>/dev/null
 fi
 
 if command -v update-desktop-database &> /dev/null; then
     update-desktop-database "$APP_DIR" &> /dev/null
+fi
+
+# FORCES THE BIG LINUX SIDEBAR TO REFRESH IMMEDIATELY
+echo "🔄 Atualizando cache do menu do sistema..."
+if command -v kbuildsycoca6 &> /dev/null; then
+    kbuildsycoca6 &> /dev/null
+elif command -v kbuildsycoca5 &> /dev/null; then
+    kbuildsycoca5 &> /dev/null
 fi
 
 echo "✅ Concluído!"
