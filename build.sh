@@ -49,12 +49,12 @@ cp "./$LOCAL_OUTPUT_NAME" "$BIN_DIR/$EXEC_NAME"
 echo "🖥️ Adicionando ao Menu do Sistema..."
 DESKTOP_ENTRY_CONTENT="[Desktop Entry]
 Name=Wine Linux Program Uninstaller Z
-Comment=Remova programas Windows via atalho ou .exe
+Comment=Remove Windows programs from Linux via shortcut or .exe
 Exec=$BIN_DIR/$EXEC_NAME
 Icon=$ICON_SETTING
 Terminal=false
 Type=Application
-Categories=Utility;Wine;System;
+Categories=Utility;Wine;
 "
 
 echo "$DESKTOP_ENTRY_CONTENT" > "$APP_DIR/$EXEC_NAME.desktop"
