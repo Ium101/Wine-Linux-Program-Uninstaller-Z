@@ -8,7 +8,7 @@ from pathlib import Path
 class WineLinuxUninstaller:
     def __init__(self, root):
         self.root = root
-        self.root.title("Wine Linux Uninstaller Z")
+        self.root.title("Wine Linux Program Uninstaller Z")
         self.root.geometry("500x520")
         self.root.eval('tk::PlaceWindow . center')
         self.root.resizable(True, True) 
@@ -29,7 +29,7 @@ class WineLinuxUninstaller:
         self.lang = "en" 
         self.texts = {
             "en": {
-                "title": "Wine Linux Uninstaller Z",
+                "title": "Wine Linux Program Uninstaller Z",
                 "subtitle": "Force-remove Windows apps via shortcuts or .exe",
                 "step1": "1. Select the Shortcut or .exe file:",
                 "no_file": "No file selected",
@@ -50,7 +50,7 @@ class WineLinuxUninstaller:
                 "ask_file": "Select the shortcut or .exe file"
             },
             "pt": {
-                "title": "Wine Linux Uninstaller Z",
+                "title": "Wine Linux Program Uninstaller Z",
                 "subtitle": "Remova programas Windows via atalho ou .exe",
                 "step1": "1. Selecione o Atalho ou arquivo .exe:",
                 "no_file": "Nenhum arquivo selecionado",
