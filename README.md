@@ -1,4 +1,4 @@
-# Wine Linux Uninstaller Z 🗑️🐧
+# Wine Linux Program Uninstaller Z 🗑️🐧
 
 **The Ultimate Cleaning Tool for Wine on Linux • Made by Ium101**
 
@@ -12,7 +12,7 @@
 
 ## 📝 Summary
 
-The **Wine Linux Uninstaller Z** is a lightweight, intuitive Graphical User Interface (GUI) tool designed to solve the common issue of residual files left behind by Windows applications on Linux via Wine.
+The **Wine Linux Program Uninstaller Z** is a lightweight, intuitive Graphical User Interface (GUI) tool designed to solve the common issue of residual files left behind by Windows applications on Linux via Wine.
 
 Built natively with Python and Tkinter, this tool allows you to completely force-uninstall Windows apps when you are done, ensuring no trace is left behind on your system.
 
@@ -49,7 +49,7 @@ sudo pacman -S python python-tkinter icoutils
 
 ## 📝 Resumo
 
-O **Wine Linux Uninstaller Z** é uma ferramenta de interface gráfica (GUI) leve e intuitiva, projetada para resolver o problema comum de arquivos residuais deixados por aplicativos Windows no Linux via Wine.
+O **Wine Linux Program Uninstaller Z** é uma ferramenta de interface gráfica (GUI) leve e intuitiva, projetada para resolver o problema comum de arquivos residuais deixados por aplicativos Windows no Linux via Wine.
 
 Construído nativamente com Python e Tkinter, esta ferramenta permite que você desinstale completamente aplicativos Windows quando terminar, garantindo que nenhum rastro seja deixado no seu sistema.
 
