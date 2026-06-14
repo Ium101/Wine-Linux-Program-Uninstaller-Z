@@ -1,0 +1,273 @@
+import os
+import re
+import subprocess
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from pathlib import Path
+
+class WineLinuxUninstaller:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Wine Linux Uninstaller Z")
+        self.root.geometry("500x520")
+        self.root.eval('tk::PlaceWindow . center')
+        self.root.resizable(True, True) 
+        
+        self.bg_color = "#232429"      
+        self.fg_color = "#E0E0E0"      
+        self.sec_bg = "#2D2E33"        
+        self.btn_bg = "#3A3D45"        
+        self.btn_fg = "#FFFFFF"        
+        self.btn_accent = "#D32F2F"    
+        self.color_gray = "#8E929B"    
+        self.color_green = "#81C995"   
+        self.color_red = "#F28B82"     
+        self.color_blue = "#8AB4F8"    
+        
+        self.root.configure(bg=self.bg_color)
+        
+        self.lang = "en" 
+        self.texts = {
+            "en": {
+                "title": "Wine Linux Uninstaller Z",
+                "subtitle": "Force-remove Windows apps via shortcuts or .exe",
+                "step1": "1. Select the Shortcut or .exe file:",
+                "no_file": "No file selected",
+                "browse": "Browse File",
+                "step2": "2. Detected Application:",
+                "app_name": "Name: -",
+                "app_path": "Path: -",
+                "btn_uninstall": "🗑️ Force Uninstall Program",
+                "credits": "Companion Tool • Made by Ium101",
+                "lang_btn": "🇧🇷 Mudar para Português",
+                "err_step1": "Please select a file first.",
+                "err_not_wine": "❌ Ignored: This is NOT a Windows/Wine program.",
+                "err_parse": "❌ Could not detect the Windows program path.",
+                "warn_title": "⚠️ DANGER: Confirm Deletion",
+                "warn_msg": "Are you sure you want to PERMANENTLY delete this folder and all its contents?\n\nFolder: {0}\n\nThis cannot be undone!",
+                "success_title": "Uninstalled Successfully",
+                "success_msg": "The program '{0}' was completely removed!\n\n✓ Folder deleted.\n✓ Start Menu & Desktop cleaned.",
+                "ask_file": "Select the shortcut or .exe file"
+            },
+            "pt": {
+                "title": "Wine Linux Uninstaller Z",
+                "subtitle": "Remova programas Windows via atalho ou .exe",
+                "step1": "1. Selecione o Atalho ou arquivo .exe:",
+                "no_file": "Nenhum arquivo selecionado",
+                "browse": "Procurar Arquivo",
+                "step2": "2. Aplicativo Detectado:",
+                "app_name": "Nome: -",
+                "app_path": "Caminho: -",
+                "btn_uninstall": "🗑️ Desinstalar Forçadamente",
+                "credits": "Ferramenta Companheira • Feito por Ium101",
+                "lang_btn": "🇺🇸 Switch to English",
+                "err_step1": "Por favor, selecione um arquivo primeiro.",
+                "err_not_wine": "❌ Ignorado: Este NÃO é um programa Windows/Wine.",
+                "err_parse": "❌ Não foi possível detectar a pasta do programa.",
+                "warn_title": "⚠️ PERIGO: Confirmar Exclusão",
+                "warn_msg": "Tem certeza que deseja deletar PERMANENTEMENTE esta pasta e todo o seu conteúdo?\n\nPasta: {0}\n\nIsso não pode ser desfeito!",
+                "success_title": "Desinstalado com Sucesso",
+                "success_msg": "O programa '{0}' foi completamente removido!\n\n✓ Pasta deletada.\n✓ Menu Iniciar e Área de Trabalho limpos.",
+                "ask_file": "Selecione o atalho ou o arquivo .exe"
+            }
+        }
+        
+        self.caminho_selecionado = ""
+        self.app_nome = ""
+        self.app_pasta = ""
+        
+        btn_style = {"bg": self.btn_bg, "fg": self.btn_fg, "activebackground": "#555963", "activeforeground": "white", "relief": "ridge", "bd": 1}
+        
+        self.lbl_credits = tk.Label(root, text=self.texts[self.lang]["credits"], fg=self.color_gray, bg=self.bg_color, font=("Arial", 8))
+        self.lbl_credits.pack(side="bottom", pady=10)
+
+        frame_top = tk.Frame(root, bg=self.bg_color)
+        frame_top.pack(fill="x", pady=10)
+        
+        self.btn_lang = tk.Button(frame_top, text=self.texts[self.lang]["lang_btn"], command=self.toggle_lang, 
+                                  bg=self.bg_color, fg=self.color_blue, activebackground=self.bg_color, 
+                                  activeforeground="white", relief="flat", cursor="hand2", font=("Arial", 9, "bold"))
+        self.btn_lang.pack(anchor="center")
+        
+        self.lbl_title = tk.Label(root, text=self.texts[self.lang]["title"], font=("Arial", 14, "bold"), bg=self.bg_color, fg="white")
+        self.lbl_title.pack(pady=(0, 5))
+        self.lbl_subtitle = tk.Label(root, text=self.texts[self.lang]["subtitle"], bg=self.bg_color, fg=self.color_gray)
+        self.lbl_subtitle.pack(pady=(0, 15))
+        
+        self.lbl_step1 = tk.Label(root, text=self.texts[self.lang]["step1"], font=("Arial", 10, "bold"), bg=self.bg_color, fg=self.fg_color)
+        self.lbl_step1.pack(anchor="w", padx=20)
+        
+        frame_file = tk.Frame(root, bg=self.bg_color)
+        frame_file.pack(fill="x", padx=20, pady=5)
+        
+        self.lbl_file = tk.Label(frame_file, text=self.texts[self.lang]["no_file"], fg=self.color_gray, bg=self.bg_color, wraplength=350, justify="left")
+        self.lbl_file.pack(side="left", expand=True, fill="x")
+        self.btn_browse = tk.Button(frame_file, text=self.texts[self.lang]["browse"], command=self.selecionar_arquivo, **btn_style)
+        self.btn_browse.pack(side="right")
+        
+        self.lbl_step2 = tk.Label(root, text=self.texts[self.lang]["step2"], font=("Arial", 10, "bold"), bg=self.bg_color, fg=self.fg_color)
+        self.lbl_step2.pack(anchor="w", padx=20, pady=(15, 5))
+        
+        frame_info = tk.Frame(root, bg=self.sec_bg, bd=2, relief="groove")
+        frame_info.pack(fill="x", padx=20, pady=5, ipady=10)
+        
+        self.lbl_app_name = tk.Label(frame_info, text=self.texts[self.lang]["app_name"], font=("Arial", 11, "bold"), bg=self.sec_bg, fg=self.color_green)
+        self.lbl_app_name.pack(anchor="w", padx=10, pady=2)
+        
+        self.lbl_app_path = tk.Label(frame_info, text=self.texts[self.lang]["app_path"], bg=self.sec_bg, fg="white", wraplength=420, justify="left")
+        self.lbl_app_path.pack(anchor="w", padx=10, pady=2)
+        
+        self.btn_uninstall = tk.Button(root, text=self.texts[self.lang]["btn_uninstall"], command=self.desinstalar, 
+                                    font=("Arial", 11, "bold"), pady=8, bg=self.btn_accent, fg="white", 
+                                    activebackground="#B71C1C", activeforeground="white", relief="flat", state="disabled")
+        self.btn_uninstall.pack(pady=25)
+
+    def toggle_lang(self):
+        self.lang = "pt" if self.lang == "en" else "en"
+        t = self.texts[self.lang]
+        
+        self.btn_lang.config(text=t["lang_btn"])
+        self.lbl_title.config(text=t["title"])
+        self.lbl_subtitle.config(text=t["subtitle"])
+        self.lbl_step1.config(text=t["step1"])
+        self.btn_browse.config(text=t["browse"])
+        self.lbl_step2.config(text=t["step2"])
+        self.btn_uninstall.config(text=t["btn_uninstall"])
+        self.lbl_credits.config(text=t["credits"])
+        
+        if not self.caminho_selecionado:
+            self.lbl_file.config(text=t["no_file"])
+            self.lbl_app_name.config(text=t["app_name"])
+            self.lbl_app_path.config(text=t["app_path"])
+        else:
+            self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
+            if "❌" in self.lbl_app_path.cget("text"):
+                pass 
+            else:
+                self.lbl_app_path.config(text=f"Caminho: {self.app_pasta}" if self.lang == "pt" else f"Path: {self.app_pasta}")
+
+    def obter_area_de_trabalho(self):
+        try:
+            res = subprocess.run(['xdg-user-dir', 'DESKTOP'], stdout=subprocess.PIPE, text=True)
+            return Path(res.stdout.strip())
+        except:
+            return Path.home() / "Desktop"
+
+    def selecionar_arquivo(self):
+        t = self.texts[self.lang]
+        # AGORA ACEITA QUALQUER ARQUIVO (Ignora se o Linux escondeu a extensão)
+        caminho = filedialog.askopenfilename(
+            title=t["ask_file"], 
+            initialdir=self.obter_area_de_trabalho(),
+            filetypes=[("Shortcuts or Executables", "*.desktop *.exe"), ("All Files", "*.*")]
+        )
+        
+        if caminho:
+            self.caminho_selecionado = caminho
+            self.lbl_file.config(text=os.path.basename(caminho), fg=self.fg_color)
+            self.analisar_arquivo()
+
+    def analisar_arquivo(self):
+        t = self.texts[self.lang]
+        self.app_nome = os.path.basename(self.caminho_selecionado).replace(".desktop", "").replace(".exe", "")
+        self.app_pasta = ""
+        
+        # CASO 1: O usuário selecionou o próprio arquivo .exe diretamente
+        if self.caminho_selecionado.lower().endswith(".exe"):
+            self.app_pasta = os.path.dirname(self.caminho_selecionado)
+            self.atualizar_interface_sucesso()
+            return
+            
+        # CASO 2: O usuário selecionou um arquivo de Atalho (com ou sem extensão)
+        try:
+            with open(self.caminho_selecionado, 'r', encoding='utf-8', errors='ignore') as f:
+                conteudo = f.read()
+                
+            texto_lower = conteudo.lower()
+            
+            # FILTRO DE SEGURANÇA: Se não tiver "wine" ou ".exe" no texto do atalho, rejeita!
+            if "wine" not in texto_lower and ".exe" not in texto_lower:
+                self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
+                self.lbl_app_path.config(text=t["err_not_wine"], fg=self.color_red)
+                self.btn_uninstall.config(state="disabled")
+                return
+
+            # Procura por Path=
+            match_path = re.search(r'^Path=(.*)$', conteudo, re.MULTILINE)
+            if match_path:
+                self.app_pasta = match_path.group(1).strip()
+            else:
+                # SCANNER LASER: Se não tiver Path=, extrai o caminho absoluto do .exe dentro do Exec=
+                match_exe = re.search(r'(/[^"\'=><|\n\r]+\.exe)', conteudo, re.IGNORECASE)
+                if match_exe:
+                    self.app_pasta = os.path.dirname(match_exe.group(1).strip())
+
+            # Limpa caminhos com ~
+            if self.app_pasta:
+                self.app_pasta = os.path.expanduser(self.app_pasta)
+
+            # Verifica se encontrou e se a pasta realmente existe
+            if self.app_pasta and os.path.isdir(self.app_pasta):
+                self.atualizar_interface_sucesso()
+            else:
+                self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
+                self.lbl_app_path.config(text=t["err_parse"], fg=self.color_red)
+                self.btn_uninstall.config(state="disabled")
+                
+        except Exception as e:
+            messagebox.showerror("Erro / Error", f"Falha ao analisar arquivo:\n{e}")
+
+    def atualizar_interface_sucesso(self):
+        self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
+        self.lbl_app_path.config(text=f"Caminho: {self.app_pasta}" if self.lang == "pt" else f"Path: {self.app_pasta}", fg="white")
+        self.btn_uninstall.config(state="normal")
+
+    def desinstalar(self):
+        t = self.texts[self.lang]
+        
+        # Trava de Segurança Crítica: Impede de deletar /, /home, /mnt, etc.
+        caminho_seguro = Path(self.app_pasta)
+        if len(caminho_seguro.parts) <= 3:
+            messagebox.showerror("Erro de Segurança / Security Error", "O diretório raiz é muito amplo para ser deletado por segurança (Ex: /mnt ou /home).")
+            return
+
+        resposta = messagebox.askyesno(t["warn_title"], t["warn_msg"].format(self.app_pasta), icon="warning")
+        
+        if resposta:
+            try:
+                # 1. Apaga a pasta do Windows App
+                subprocess.run(['rm', '-rf', self.app_pasta])
+                
+                # 2. Apaga o arquivo selecionado (atalho ou .exe)
+                if os.path.exists(self.caminho_selecionado):
+                    os.remove(self.caminho_selecionado)
+                
+                # 3. Limpeza Extrema: Varre o Menu Iniciar procurando atalhos com esse nome
+                pasta_menu = Path.home() / ".local" / "share" / "applications"
+                nome_busca = self.app_nome.lower().replace(" ", "")
+                
+                if pasta_menu.exists():
+                    for arquivo in os.listdir(pasta_menu):
+                        if arquivo.endswith(".desktop") and nome_busca in arquivo.lower().replace(" ", ""):
+                            os.remove(pasta_menu / arquivo)
+                    
+                subprocess.run(['update-desktop-database', str(pasta_menu)], stderr=subprocess.DEVNULL)
+                
+                messagebox.showinfo(t["success_title"], t["success_msg"].format(self.app_nome))
+                
+                # Reset visual
+                self.caminho_selecionado = ""
+                self.app_nome = ""
+                self.app_pasta = ""
+                self.lbl_file.config(text=t["no_file"], fg=self.color_gray)
+                self.lbl_app_name.config(text=t["app_name"])
+                self.lbl_app_path.config(text=t["app_path"], fg="white")
+                self.btn_uninstall.config(state="disabled")
+                
+            except Exception as e:
+                messagebox.showerror("Erro / Error", str(e))
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = WineLinuxUninstaller(root)
+    root.mainloop()
