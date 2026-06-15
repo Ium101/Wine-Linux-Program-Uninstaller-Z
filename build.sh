@@ -10,15 +10,15 @@ DESKTOP_DIR=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
 echo "⚙️ Iniciando a construção..."
 
 # FIXED: Now correctly detects the hyphenated filename
-if [ -f "wine-linux-uninstaller-z.py" ]; then
+if [ -f "wine-linux-program-uninstaller-z.py" ]; then
     SCRIPT_NAME="wine-linux-uninstaller-z.py"
-elif [ -f "Wine_Linux_Uninstaller_Z.py" ]; then
-    SCRIPT_NAME="Wine_Linux_Uninstaller_Z.py"
-elif [ -f "wine_linux_uninstaller_z.py" ]; then
-    SCRIPT_NAME="wine_linux_uninstaller_z.py"
+elif [ -f "Wine_Linux_Program_Uninstaller_Z.py" ]; then
+    SCRIPT_NAME="Wine_Linux_Program_Uninstaller_Z.py"
+elif [ -f "wine_linux_program_uninstaller_z.py" ]; then
+    SCRIPT_NAME="wine_linux_program_uninstaller_z.py"
 else
     echo "❌ Erro: O arquivo do script Python não foi encontrado."
-    echo "Certifique-se de que o arquivo se chama 'wine-linux-uninstaller-z.py'."
+    echo "Certifique-se de que o arquivo se chama 'wine-linux-program-uninstaller-z.py'."
     exit 1
 fi
 
@@ -31,18 +31,22 @@ mkdir -p "$ICON_DIR"
 echo "🖼️ Instalando ícone..."
 cat > "$ICON_DIR/$EXEC_NAME.svg" << 'SVGEOF'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="256" height="256">
-  <!-- lid handle -->
-  <rect x="38" y="4" width="24" height="10" rx="5" fill="#E53935"/>
-  <!-- lid -->
-  <rect x="10" y="16" width="80" height="14" rx="6" fill="#E53935"/>
-  <!-- body -->
-  <rect x="16" y="34" width="68" height="78" rx="8" fill="#E53935"/>
-  <!-- left inner line -->
-  <rect x="32" y="44" width="8" height="54" rx="4" fill="#1a1a1a"/>
-  <!-- center inner line -->
-  <rect x="46" y="44" width="8" height="54" rx="4" fill="#1a1a1a"/>
-  <!-- right inner line -->
-  <rect x="60" y="44" width="8" height="54" rx="4" fill="#1a1a1a"/>
+  <defs>
+    <!-- clips stripes to only appear inside body -->
+    <clipPath id="bodyClip">
+      <rect x="20" y="38" width="60" height="66" rx="6"/>
+    </clipPath>
+  </defs>
+  <!-- lid handle: outline only -->
+  <rect x="38" y="3" width="24" height="11" rx="5" fill="none" stroke="#E53935" stroke-width="6"/>
+  <!-- lid: filled solid bar -->
+  <rect x="8" y="15" width="84" height="13" rx="6" fill="#E53935"/>
+  <!-- body: outline only, transparent interior -->
+  <rect x="16" y="32" width="68" height="80" rx="8" fill="none" stroke="#E53935" stroke-width="6"/>
+  <!-- stripes: solid red bars clipped inside body outline -->
+  <rect x="32" y="38" width="8" height="66" rx="4" fill="#E53935" clip-path="url(#bodyClip)"/>
+  <rect x="46" y="38" width="8" height="66" rx="4" fill="#E53935" clip-path="url(#bodyClip)"/>
+  <rect x="60" y="38" width="8" height="66" rx="4" fill="#E53935" clip-path="url(#bodyClip)"/>
 </svg>
 SVGEOF
 ICON_SETTING="$ICON_DIR/$EXEC_NAME.svg"
@@ -57,7 +61,7 @@ cp "./$LOCAL_OUTPUT_NAME" "$BIN_DIR/$EXEC_NAME"
 echo "🖥️ Adicionando ao Menu do Sistema..."
 DESKTOP_ENTRY_CONTENT="[Desktop Entry]
 Name=Wine Linux Program Uninstaller Z
-Comment=Remove Windows programs from Linux via shortcut or .exe
+Comment=Remove Windows programs from Linux via shortcut or .exe file
 Exec=$BIN_DIR/$EXEC_NAME
 Icon=$ICON_SETTING
 Terminal=false
