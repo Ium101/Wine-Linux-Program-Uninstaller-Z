@@ -2,16 +2,90 @@ import os
 import re
 import subprocess
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
+import time
+
+def open_native_file_dialog(title, initialdir, filetypes):
+    """
+    Opens the real native file picker of the desktop environment:
+    - KDE/Big Linux: kdialog (real Dolphin picker)
+    - GNOME: zenity
+    - Fallback: tkinter filedialog
+    """
+    # Build filter strings
+    kde_filters = []
+    zenity_filters = []
+    tk_types = filetypes
+
+    for label, patterns in filetypes:
+        kde_filters.append(f"{label} ({patterns})")
+        for pat in patterns.split():
+            zenity_filters += ["--file-filter", pat]
+
+    # 1. Try kdialog (KDE / Big Linux — opens real Dolphin)
+    try:
+        if subprocess.run(["which", "kdialog"], capture_output=True).returncode == 0:
+            cmd = [
+                "kdialog",
+                "--getopenfilename", str(initialdir),
+                " | ".join(kde_filters),
+                "--title", title,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                path = result.stdout.strip()
+                if path and os.path.isfile(path):
+                    return path
+            return None  # user cancelled
+    except Exception:
+        pass
+
+    # 2. Try zenity (GNOME / other GTK desktops)
+    try:
+        if subprocess.run(["which", "zenity"], capture_output=True).returncode == 0:
+            cmd = [
+                "zenity", "--file-selection",
+                "--title", title,
+                "--filename", str(initialdir) + "/",
+            ] + zenity_filters
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                path = result.stdout.strip()
+                if path and os.path.isfile(path):
+                    return path
+            return None  # user cancelled
+    except Exception:
+        pass
+
+    # 3. Fallback: plain tkinter dialog
+    from tkinter import filedialog as _fd
+    path = _fd.askopenfilename(title=title, initialdir=str(initialdir), filetypes=tk_types)
+    return path if path else None
 
 class WineLinuxUninstaller:
     def __init__(self, root):
         self.root = root
         self.root.title("Wine Linux Program Uninstaller Z")
         self.root.geometry("500x520")
-        self.root.eval('tk::PlaceWindow . center')
-        self.root.resizable(True, True) 
+        self.root.resizable(True, True)
+        
+        # Try to center window - with fallback for systems where this fails
+        try:
+            self.root.update_idletasks()
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            
+            # Only if we got valid dimensions
+            if screen_width > 1 and screen_height > 1:
+                x = (screen_width // 2) - 250
+                y = (screen_height // 2) - 260
+                # Ensure coordinates are positive
+                x = max(0, x)
+                y = max(0, y)
+                self.root.geometry(f"+{x}+{y}")
+        except Exception as e:
+            pass  # If centering fails, just use default position 
         
         self.bg_color = "#232429"      
         self.fg_color = "#E0E0E0"      
@@ -155,13 +229,10 @@ class WineLinuxUninstaller:
 
     def selecionar_arquivo(self):
         t = self.texts[self.lang]
-        # AGORA ACEITA QUALQUER ARQUIVO (Ignora se o Linux escondeu a extensão)
-        caminho = filedialog.askopenfilename(
-            title=t["ask_file"], 
-            initialdir=self.obter_area_de_trabalho(),
-            filetypes=[("Shortcuts or Executables", "*.desktop *.exe"), ("All Files", "*.*")]
-        )
-        
+        filetypes = [("Shortcuts or Executables", "*.desktop *.exe"), ("All Files", "*.*")]
+
+        caminho = open_native_file_dialog(t["ask_file"], self.obter_area_de_trabalho(), filetypes)
+
         if caminho:
             self.caminho_selecionado = caminho
             self.lbl_file.config(text=os.path.basename(caminho), fg=self.fg_color)

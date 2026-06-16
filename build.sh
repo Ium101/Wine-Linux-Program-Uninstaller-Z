@@ -6,19 +6,19 @@ BIN_DIR="$HOME/.local/bin"
 APP_DIR="$HOME/.local/share/applications"
 ICON_DIR="$HOME/.local/share/icons"
 DESKTOP_DIR=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
+DESKTOP_FILE_NAME="wine-linux-program-uninstaller-z.desktop"
 
-echo "⚙️ Iniciando a construção..."
+echo "⚙️ Iniciando a construção do Wine Linux Program Uninstaller Z..."
 
-# FIXED: Now correctly detects the hyphenated filename
+# FIXED: detect file AND assign the correct name
 if [ -f "wine-linux-program-uninstaller-z.py" ]; then
-    SCRIPT_NAME="wine-linux-uninstaller-z.py"
+    SCRIPT_NAME="wine-linux-program-uninstaller-z.py"
 elif [ -f "Wine_Linux_Program_Uninstaller_Z.py" ]; then
     SCRIPT_NAME="Wine_Linux_Program_Uninstaller_Z.py"
 elif [ -f "wine_linux_program_uninstaller_z.py" ]; then
     SCRIPT_NAME="wine_linux_program_uninstaller_z.py"
 else
     echo "❌ Erro: O arquivo do script Python não foi encontrado."
-    echo "Certifique-se de que o arquivo se chama 'wine-linux-program-uninstaller-z.py'."
     exit 1
 fi
 
@@ -31,25 +31,14 @@ mkdir -p "$ICON_DIR"
 echo "🖼️ Instalando ícone..."
 cat > "$ICON_DIR/$EXEC_NAME.svg" << 'SVGEOF'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="256" height="256">
-  <defs>
-    <!-- clips stripes to only appear inside body -->
-    <clipPath id="bodyClip">
-      <rect x="20" y="38" width="60" height="66" rx="6"/>
-    </clipPath>
-  </defs>
-  <!-- lid handle: outline only -->
   <rect x="38" y="3" width="24" height="11" rx="5" fill="none" stroke="#E53935" stroke-width="6"/>
-  <!-- lid: filled solid bar -->
   <rect x="8" y="15" width="84" height="13" rx="6" fill="#E53935"/>
-  <!-- body: outline only, transparent interior -->
   <rect x="16" y="32" width="68" height="80" rx="8" fill="none" stroke="#E53935" stroke-width="6"/>
-  <!-- stripes: solid red bars clipped inside body outline -->
-  <rect x="32" y="38" width="8" height="66" rx="4" fill="#E53935" clip-path="url(#bodyClip)"/>
-  <rect x="46" y="38" width="8" height="66" rx="4" fill="#E53935" clip-path="url(#bodyClip)"/>
-  <rect x="60" y="38" width="8" height="66" rx="4" fill="#E53935" clip-path="url(#bodyClip)"/>
+  <line x1="37" y1="48" x2="37" y2="96" stroke="#E53935" stroke-width="6" stroke-linecap="round"/>
+  <line x1="50" y1="48" x2="50" y2="96" stroke="#E53935" stroke-width="6" stroke-linecap="round"/>
+  <line x1="63" y1="48" x2="63" y2="96" stroke="#E53935" stroke-width="6" stroke-linecap="round"/>
 </svg>
 SVGEOF
-ICON_SETTING="$ICON_DIR/$EXEC_NAME.svg"
 # ─────────────────────────────────────────────────────────────────────────────
 
 echo "📦 Gerando executável..."
@@ -59,33 +48,30 @@ chmod +x "./$LOCAL_OUTPUT_NAME"
 cp "./$LOCAL_OUTPUT_NAME" "$BIN_DIR/$EXEC_NAME"
 
 echo "🖥️ Adicionando ao Menu do Sistema..."
-DESKTOP_ENTRY_CONTENT="[Desktop Entry]
+cat > "$APP_DIR/$DESKTOP_FILE_NAME" << DESKTOPEOF
+[Desktop Entry]
 Name=Wine Linux Program Uninstaller Z
-Comment=Remove Windows programs from Linux via shortcut or .exe file
+Comment=Force-remove Wine programs completely via their shortcuts
 Exec=$BIN_DIR/$EXEC_NAME
-Icon=$ICON_SETTING
+Icon=$ICON_DIR/$EXEC_NAME.svg
 Terminal=false
 Type=Application
-Categories=Utility;Wine;
-"
-
-echo "$DESKTOP_ENTRY_CONTENT" > "$APP_DIR/$EXEC_NAME.desktop"
-chmod +x "$APP_DIR/$EXEC_NAME.desktop"
+Categories=Utility;Wine;System;
+DESKTOPEOF
+chmod +x "$APP_DIR/$DESKTOP_FILE_NAME"
 
 echo "🏠 Criando atalho na Área de Trabalho..."
-DESKTOP_FILE_PATH="$DESKTOP_DIR/$EXEC_NAME.desktop"
-echo "$DESKTOP_ENTRY_CONTENT" > "$DESKTOP_FILE_PATH"
-chmod 755 "$DESKTOP_FILE_PATH"
+cp "$APP_DIR/$DESKTOP_FILE_NAME" "$DESKTOP_DIR/$DESKTOP_FILE_NAME"
+chmod 755 "$DESKTOP_DIR/$DESKTOP_FILE_NAME"
 
 if command -v gio &> /dev/null; then
-    gio set "$DESKTOP_FILE_PATH" metadata::trusted true 2>/dev/null
+    gio set "$DESKTOP_DIR/$DESKTOP_FILE_NAME" metadata::trusted true 2>/dev/null
 fi
 
 if command -v update-desktop-database &> /dev/null; then
     update-desktop-database "$APP_DIR" &> /dev/null
 fi
 
-# FORCES THE BIG LINUX SIDEBAR TO REFRESH IMMEDIATELY
 echo "🔄 Atualizando cache do menu do sistema..."
 if command -v kbuildsycoca6 &> /dev/null; then
     kbuildsycoca6 &> /dev/null
