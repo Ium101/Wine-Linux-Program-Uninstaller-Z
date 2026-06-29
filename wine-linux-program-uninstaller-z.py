@@ -1,10 +1,46 @@
 import os
 import re
+import configparser
 import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 import time
+
+# ── Theme palettes ────────────────────────────────────────────────────────────
+THEMES = {
+    "dark": {
+        "bg":        "#232429",
+        "fg":        "#E0E0E0",
+        "sec_bg":    "#2D2E33",
+        "btn_bg":    "#3A3D45",
+        "btn_fg":    "#FFFFFF",
+        "accent":    "#D32F2F",
+        "accent_hl": "#B71C1C",
+        "gray":      "#8E929B",
+        "green":     "#81C995",
+        "red":       "#F28B82",
+        "blue":      "#8AB4F8",
+        "active_bg": "#555963",
+        "theme_icon":"☀️",
+    },
+    "light": {
+        "bg":        "#F2F2F7",
+        "fg":        "#1C1C1E",
+        "sec_bg":    "#E5E5EA",
+        "btn_bg":    "#D1D1D6",
+        "btn_fg":    "#1C1C1E",
+        "accent":    "#C62828",
+        "accent_hl": "#8E0000",
+        "gray":      "#636366",
+        "green":     "#2E7D32",
+        "red":       "#C62828",
+        "blue":      "#1565C0",
+        "active_bg": "#C7C7CC",
+        "theme_icon":"🌙",
+    },
+}
+
 
 def open_native_file_dialog(title, initialdir, filetypes):
     """
@@ -13,7 +49,6 @@ def open_native_file_dialog(title, initialdir, filetypes):
     - GNOME: zenity
     - Fallback: tkinter filedialog
     """
-    # Build filter strings
     kde_filters = []
     zenity_filters = []
     tk_types = filetypes
@@ -37,7 +72,7 @@ def open_native_file_dialog(title, initialdir, filetypes):
                 path = result.stdout.strip()
                 if path and os.path.isfile(path):
                     return path
-            return None  # user cancelled
+            return None
     except Exception:
         pass
 
@@ -54,7 +89,7 @@ def open_native_file_dialog(title, initialdir, filetypes):
                 path = result.stdout.strip()
                 if path and os.path.isfile(path):
                     return path
-            return None  # user cancelled
+            return None
     except Exception:
         pass
 
@@ -63,44 +98,37 @@ def open_native_file_dialog(title, initialdir, filetypes):
     path = _fd.askopenfilename(title=title, initialdir=str(initialdir), filetypes=tk_types)
     return path if path else None
 
+
 class WineLinuxUninstaller:
     def __init__(self, root):
         self.root = root
         self.root.title("Wine Linux Program Uninstaller Z")
         self.root.geometry("500x520")
         self.root.resizable(True, True)
-        
-        # Try to center window - with fallback for systems where this fails
+
+        # Center window
         try:
             self.root.update_idletasks()
-            screen_width = self.root.winfo_screenwidth()
+            screen_width  = self.root.winfo_screenwidth()
             screen_height = self.root.winfo_screenheight()
-            
-            # Only if we got valid dimensions
             if screen_width > 1 and screen_height > 1:
-                x = (screen_width // 2) - 250
-                y = (screen_height // 2) - 260
-                # Ensure coordinates are positive
-                x = max(0, x)
-                y = max(0, y)
+                x = max(0, (screen_width  // 2) - 250)
+                y = max(0, (screen_height // 2) - 260)
                 self.root.geometry(f"+{x}+{y}")
-        except Exception as e:
-            pass  # If centering fails, just use default position 
-        
-        self.bg_color = "#232429"      
-        self.fg_color = "#E0E0E0"      
-        self.sec_bg = "#2D2E33"        
-        self.btn_bg = "#3A3D45"        
-        self.btn_fg = "#FFFFFF"        
-        self.btn_accent = "#D32F2F"    
-        self.color_gray = "#8E929B"    
-        self.color_green = "#81C995"   
-        self.color_red = "#F28B82"     
-        self.color_blue = "#8AB4F8"    
-        
+        except Exception:
+            pass
+
+        # --- Persistent config paths (must come before _apply_palette) ---
+        self.config_dir = Path(__file__).resolve().parent
+        self.config_file = self.config_dir / "config_un.ini"
+
+        # --- Load saved settings (theme + language) ---
+        settings = self._load_settings()
+        self.current_theme = settings.get("theme", "dark")
+        self._apply_palette()
         self.root.configure(bg=self.bg_color)
-        
-        self.lang = "en" 
+
+        self.lang = settings.get("language", "en")
         self.texts = {
             "en": {
                 "title": "Wine Linux Program Uninstaller Z",
@@ -145,61 +173,221 @@ class WineLinuxUninstaller:
                 "ask_file": "Selecione o atalho ou o arquivo .exe"
             }
         }
-        
+
         self.caminho_selecionado = ""
-        self.app_nome = ""
+        self.app_nome  = ""
         self.app_pasta = ""
-        
-        btn_style = {"bg": self.btn_bg, "fg": self.btn_fg, "activebackground": "#555963", "activeforeground": "white", "relief": "ridge", "bd": 1}
-        
-        self.lbl_credits = tk.Label(root, text=self.texts[self.lang]["credits"], fg=self.color_gray, bg=self.bg_color, font=("Arial", 8))
+
+        self._build_ui()
+
+    # ── Theme helpers ─────────────────────────────────────────────────────────
+    def _apply_palette(self):
+        """Copy the active theme's colours into convenient self.* attributes."""
+        p = THEMES[self.current_theme]
+        self.bg_color    = p["bg"]
+        self.fg_color    = p["fg"]
+        self.sec_bg      = p["sec_bg"]
+        self.btn_bg      = p["btn_bg"]
+        self.btn_fg      = p["btn_fg"]
+        self.btn_accent  = p["accent"]
+        self.color_gray  = p["gray"]
+        self.color_green = p["green"]
+        self.color_red   = p["red"]
+        self.color_blue  = p["blue"]
+
+    def _load_settings(self):
+        """Load saved settings (theme + language + last browsed path) from config.ini."""
+        defaults = {"theme": "dark", "language": "en", "last_path": ""}
+        try:
+            if self.config_file.exists():
+                parser = configparser.ConfigParser()
+                parser.read(self.config_file, encoding="utf-8")
+                section = parser["settings"] if parser.has_section("settings") else {}
+                theme = section.get("theme", defaults["theme"])
+                language = section.get("language", defaults["language"])
+                last_path = section.get("last_path", defaults["last_path"])
+                if theme not in THEMES:
+                    theme = defaults["theme"]
+                if language not in ("en", "pt"):
+                    language = defaults["language"]
+                return {"theme": theme, "language": language, "last_path": last_path}
+        except Exception:
+            pass
+        return defaults
+
+    def _save_settings(self, **updates):
+        """Persist current theme + language + last path to config.ini.
+
+        Any provided keyword overrides the corresponding in-memory value
+        before saving (used for last_path, which isn't kept on self).
+        """
+        try:
+            current = self._load_settings()
+            current["theme"] = self.current_theme
+            current["language"] = self.lang
+            current.update(updates)
+            parser = configparser.ConfigParser()
+            parser["settings"] = current
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                parser.write(f)
+        except Exception:
+            pass
+
+    def toggle_theme(self):
+        self.current_theme = "light" if self.current_theme == "dark" else "dark"
+        self._apply_palette()
+        self._save_settings()
+        self._repaint_ui()
+
+    def _repaint_ui(self):
+        """Recolour every widget to match the new theme without rebuilding the UI."""
+        p = THEMES[self.current_theme]
+
+        # Root
+        self.root.configure(bg=self.bg_color)
+
+        # Top bar
+        self.frame_top.configure(bg=self.bg_color)
+        self.frame_controls.configure(bg=self.bg_color)
+        self.btn_lang.config(
+            bg=self.bg_color, fg=self.color_blue,
+            activebackground=self.bg_color, activeforeground="white",
+        )
+        self.btn_theme.config(
+            bg=self.bg_color, fg=self.color_red,
+            activebackground=self.bg_color, activeforeground="white",
+            text=p["theme_icon"],
+        )
+
+        # Title / subtitle
+        self.lbl_title.config(bg=self.bg_color, fg=self.fg_color)
+        self.lbl_subtitle.config(bg=self.bg_color, fg=self.color_gray)
+
+        # Step 1 – file
+        self.lbl_step1.config(bg=self.bg_color, fg=self.fg_color)
+        self.frame_file.configure(bg=self.bg_color)
+        self.lbl_file.config(bg=self.bg_color)   # fg is dynamic; don't touch it
+        self.btn_browse.config(
+            bg=self.btn_bg, fg=self.btn_fg,
+            activebackground=p["active_bg"], activeforeground=self.btn_fg,
+        )
+
+        # Step 2 – info panel
+        self.lbl_step2.config(bg=self.bg_color, fg=self.fg_color)
+        self.frame_info.configure(bg=self.sec_bg)
+        self.lbl_app_name.config(bg=self.sec_bg)   # fg is dynamic (green / default)
+        self.lbl_app_path.config(bg=self.sec_bg)   # fg is dynamic (fg_color / red)
+
+        # Uninstall button
+        self.btn_uninstall.config(
+            bg=self.btn_accent, fg="white",
+            activebackground=p["accent_hl"], activeforeground="white",
+        )
+
+        # Credits
+        self.lbl_credits.config(bg=self.bg_color, fg=self.color_gray)
+
+    # ── UI construction ───────────────────────────────────────────────────────
+    def _build_ui(self):
+        p = THEMES[self.current_theme]
+
+        btn_style = {
+            "bg": self.btn_bg, "fg": self.btn_fg,
+            "activebackground": p["active_bg"], "activeforeground": self.btn_fg,
+            "relief": "ridge", "bd": 1,
+        }
+
+        # ── Credits (bottom) ─────────────────────────────────────────────────
+        self.lbl_credits = tk.Label(self.root, text=self.texts[self.lang]["credits"],
+                                    fg=self.color_gray, bg=self.bg_color, font=("Arial", 8))
         self.lbl_credits.pack(side="bottom", pady=10)
 
-        frame_top = tk.Frame(root, bg=self.bg_color)
-        frame_top.pack(fill="x", pady=10)
-        
-        self.btn_lang = tk.Button(frame_top, text=self.texts[self.lang]["lang_btn"], command=self.toggle_lang, 
-                                  bg=self.bg_color, fg=self.color_blue, activebackground=self.bg_color, 
-                                  activeforeground="white", relief="flat", cursor="hand2", font=("Arial", 9, "bold"))
-        self.btn_lang.pack(anchor="center")
-        
-        self.lbl_title = tk.Label(root, text=self.texts[self.lang]["title"], font=("Arial", 14, "bold"), bg=self.bg_color, fg="white")
+        # ── Top bar: language toggle + theme toggle ───────────────────────────
+        self.frame_top = tk.Frame(self.root, bg=self.bg_color)
+        self.frame_top.pack(fill="x", pady=10)
+
+        self.frame_controls = tk.Frame(self.frame_top, bg=self.bg_color)
+        self.frame_controls.pack(anchor="center")
+
+        self.btn_lang = tk.Button(
+            self.frame_controls, text=self.texts[self.lang]["lang_btn"],
+            command=self.toggle_lang,
+            bg=self.bg_color, fg=self.color_blue,
+            activebackground=self.bg_color, activeforeground="white",
+            relief="flat", cursor="hand2", font=("Arial", 9, "bold"),
+        )
+        self.btn_lang.pack(side="left", padx=(0, 10))
+
+        self.btn_theme = tk.Button(
+            self.frame_controls, text=p["theme_icon"],
+            command=self.toggle_theme,
+            bg=self.bg_color, fg=self.color_red,
+            activebackground=self.bg_color, activeforeground="white",
+            relief="flat", cursor="hand2", font=("Arial", 11),
+        )
+        self.btn_theme.pack(side="left")
+
+        # ── Title / subtitle ─────────────────────────────────────────────────
+        self.lbl_title = tk.Label(self.root, text=self.texts[self.lang]["title"],
+                                  font=("Arial", 14, "bold"), bg=self.bg_color, fg=self.fg_color)
         self.lbl_title.pack(pady=(0, 5))
-        self.lbl_subtitle = tk.Label(root, text=self.texts[self.lang]["subtitle"], bg=self.bg_color, fg=self.color_gray)
+
+        self.lbl_subtitle = tk.Label(self.root, text=self.texts[self.lang]["subtitle"],
+                                     bg=self.bg_color, fg=self.color_gray)
         self.lbl_subtitle.pack(pady=(0, 15))
-        
-        self.lbl_step1 = tk.Label(root, text=self.texts[self.lang]["step1"], font=("Arial", 10, "bold"), bg=self.bg_color, fg=self.fg_color)
+
+        # ── Step 1: file picker ───────────────────────────────────────────────
+        self.lbl_step1 = tk.Label(self.root, text=self.texts[self.lang]["step1"],
+                                  font=("Arial", 10, "bold"), bg=self.bg_color, fg=self.fg_color)
         self.lbl_step1.pack(anchor="w", padx=20)
-        
-        frame_file = tk.Frame(root, bg=self.bg_color)
-        frame_file.pack(fill="x", padx=20, pady=5)
-        
-        self.lbl_file = tk.Label(frame_file, text=self.texts[self.lang]["no_file"], fg=self.color_gray, bg=self.bg_color, wraplength=350, justify="left")
+
+        self.frame_file = tk.Frame(self.root, bg=self.bg_color)
+        self.frame_file.pack(fill="x", padx=20, pady=5)
+
+        self.lbl_file = tk.Label(self.frame_file, text=self.texts[self.lang]["no_file"],
+                                 fg=self.color_gray, bg=self.bg_color,
+                                 wraplength=350, justify="left")
         self.lbl_file.pack(side="left", expand=True, fill="x")
-        self.btn_browse = tk.Button(frame_file, text=self.texts[self.lang]["browse"], command=self.selecionar_arquivo, **btn_style)
+
+        self.btn_browse = tk.Button(self.frame_file, text=self.texts[self.lang]["browse"],
+                                    command=self.selecionar_arquivo, **btn_style)
         self.btn_browse.pack(side="right")
-        
-        self.lbl_step2 = tk.Label(root, text=self.texts[self.lang]["step2"], font=("Arial", 10, "bold"), bg=self.bg_color, fg=self.fg_color)
+
+        # ── Step 2: detected app info ─────────────────────────────────────────
+        self.lbl_step2 = tk.Label(self.root, text=self.texts[self.lang]["step2"],
+                                  font=("Arial", 10, "bold"), bg=self.bg_color, fg=self.fg_color)
         self.lbl_step2.pack(anchor="w", padx=20, pady=(15, 5))
-        
-        frame_info = tk.Frame(root, bg=self.sec_bg, bd=2, relief="groove")
-        frame_info.pack(fill="x", padx=20, pady=5, ipady=10)
-        
-        self.lbl_app_name = tk.Label(frame_info, text=self.texts[self.lang]["app_name"], font=("Arial", 11, "bold"), bg=self.sec_bg, fg=self.color_green)
+
+        self.frame_info = tk.Frame(self.root, bg=self.sec_bg, bd=2, relief="groove")
+        self.frame_info.pack(fill="x", padx=20, pady=5, ipady=10)
+
+        self.lbl_app_name = tk.Label(self.frame_info, text=self.texts[self.lang]["app_name"],
+                                     font=("Arial", 11, "bold"),
+                                     bg=self.sec_bg, fg=self.color_green)
         self.lbl_app_name.pack(anchor="w", padx=10, pady=2)
-        
-        self.lbl_app_path = tk.Label(frame_info, text=self.texts[self.lang]["app_path"], bg=self.sec_bg, fg="white", wraplength=420, justify="left")
+
+        self.lbl_app_path = tk.Label(self.frame_info, text=self.texts[self.lang]["app_path"],
+                                     bg=self.sec_bg, fg=self.fg_color,
+                                     wraplength=420, justify="left")
         self.lbl_app_path.pack(anchor="w", padx=10, pady=2)
-        
-        self.btn_uninstall = tk.Button(root, text=self.texts[self.lang]["btn_uninstall"], command=self.desinstalar, 
-                                    font=("Arial", 11, "bold"), pady=8, bg=self.btn_accent, fg="white", 
-                                    activebackground="#B71C1C", activeforeground="white", relief="flat", state="disabled")
+
+        # ── Uninstall button ──────────────────────────────────────────────────
+        self.btn_uninstall = tk.Button(
+            self.root, text=self.texts[self.lang]["btn_uninstall"],
+            command=self.desinstalar,
+            font=("Arial", 11, "bold"), pady=8,
+            bg=self.btn_accent, fg="white",
+            activebackground=p["accent_hl"], activeforeground="white",
+            relief="flat", state="disabled",
+        )
         self.btn_uninstall.pack(pady=25)
 
+    # ── Language toggle ───────────────────────────────────────────────────────
     def toggle_lang(self):
         self.lang = "pt" if self.lang == "en" else "en"
+        self._save_settings()
         t = self.texts[self.lang]
-        
+
         self.btn_lang.config(text=t["lang_btn"])
         self.lbl_title.config(text=t["title"])
         self.lbl_subtitle.config(text=t["subtitle"])
@@ -208,135 +396,164 @@ class WineLinuxUninstaller:
         self.lbl_step2.config(text=t["step2"])
         self.btn_uninstall.config(text=t["btn_uninstall"])
         self.lbl_credits.config(text=t["credits"])
-        
+
         if not self.caminho_selecionado:
             self.lbl_file.config(text=t["no_file"])
             self.lbl_app_name.config(text=t["app_name"])
             self.lbl_app_path.config(text=t["app_path"])
         else:
-            self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
-            if "❌" in self.lbl_app_path.cget("text"):
-                pass 
-            else:
-                self.lbl_app_path.config(text=f"Caminho: {self.app_pasta}" if self.lang == "pt" else f"Path: {self.app_pasta}")
+            self.lbl_app_name.config(
+                text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}"
+            )
+            if "❌" not in self.lbl_app_path.cget("text"):
+                self.lbl_app_path.config(
+                    text=f"Caminho: {self.app_pasta}" if self.lang == "pt" else f"Path: {self.app_pasta}"
+                )
 
+    # ── Desktop path helper ───────────────────────────────────────────────────
     def obter_area_de_trabalho(self):
         try:
             res = subprocess.run(['xdg-user-dir', 'DESKTOP'], stdout=subprocess.PIPE, text=True)
             return Path(res.stdout.strip())
-        except:
+        except Exception:
             return Path.home() / "Desktop"
 
+    # ── Path persistence ──────────────────────────────────────────────────────
+    def get_last_path(self):
+        try:
+            path = self._load_settings().get("last_path", "")
+            if path and os.path.isdir(path):
+                return Path(path)
+        except Exception:
+            pass
+        return self.obter_area_de_trabalho()
+
+    def save_last_path(self, path):
+        self._save_settings(last_path=path)
+
+    # ── File selection ────────────────────────────────────────────────────────
     def selecionar_arquivo(self):
         t = self.texts[self.lang]
         filetypes = [("Shortcuts or Executables", "*.desktop *.exe"), ("All Files", "*.*")]
 
-        caminho = open_native_file_dialog(t["ask_file"], self.obter_area_de_trabalho(), filetypes)
+        caminho = open_native_file_dialog(t["ask_file"], self.get_last_path(), filetypes)
 
         if caminho:
             self.caminho_selecionado = caminho
             self.lbl_file.config(text=os.path.basename(caminho), fg=self.fg_color)
+            self.save_last_path(os.path.dirname(caminho))
             self.analisar_arquivo()
 
     def analisar_arquivo(self):
         t = self.texts[self.lang]
-        self.app_nome = os.path.basename(self.caminho_selecionado).replace(".desktop", "").replace(".exe", "")
+        self.app_nome  = os.path.basename(self.caminho_selecionado).replace(".desktop", "").replace(".exe", "")
         self.app_pasta = ""
-        
-        # CASO 1: O usuário selecionou o próprio arquivo .exe diretamente
+
+        # CASE 1: User selected the .exe directly
         if self.caminho_selecionado.lower().endswith(".exe"):
             self.app_pasta = os.path.dirname(self.caminho_selecionado)
             self.atualizar_interface_sucesso()
             return
-            
-        # CASO 2: O usuário selecionou um arquivo de Atalho (com ou sem extensão)
+
+        # CASE 2: User selected a shortcut file
         try:
             with open(self.caminho_selecionado, 'r', encoding='utf-8', errors='ignore') as f:
                 conteudo = f.read()
-                
+
             texto_lower = conteudo.lower()
-            
-            # FILTRO DE SEGURANÇA: Se não tiver "wine" ou ".exe" no texto do atalho, rejeita!
+
+            # Safety filter: reject if no Wine/exe marker
             if "wine" not in texto_lower and ".exe" not in texto_lower:
-                self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
+                self.lbl_app_name.config(
+                    text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}"
+                )
                 self.lbl_app_path.config(text=t["err_not_wine"], fg=self.color_red)
                 self.btn_uninstall.config(state="disabled")
                 return
 
-            # Procura por Path=
+            # Look for Path=
             match_path = re.search(r'^Path=(.*)$', conteudo, re.MULTILINE)
             if match_path:
                 self.app_pasta = match_path.group(1).strip()
             else:
-                # SCANNER LASER: Se não tiver Path=, extrai o caminho absoluto do .exe dentro do Exec=
+                # Fallback: extract absolute .exe path from Exec=
                 match_exe = re.search(r'(/[^"\'=><|\n\r]+\.exe)', conteudo, re.IGNORECASE)
                 if match_exe:
                     self.app_pasta = os.path.dirname(match_exe.group(1).strip())
 
-            # Limpa caminhos com ~
             if self.app_pasta:
                 self.app_pasta = os.path.expanduser(self.app_pasta)
 
-            # Verifica se encontrou e se a pasta realmente existe
             if self.app_pasta and os.path.isdir(self.app_pasta):
                 self.atualizar_interface_sucesso()
             else:
-                self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
+                self.lbl_app_name.config(
+                    text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}"
+                )
                 self.lbl_app_path.config(text=t["err_parse"], fg=self.color_red)
                 self.btn_uninstall.config(state="disabled")
-                
+
         except Exception as e:
             messagebox.showerror("Erro / Error", f"Falha ao analisar arquivo:\n{e}")
 
     def atualizar_interface_sucesso(self):
-        self.lbl_app_name.config(text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}")
-        self.lbl_app_path.config(text=f"Caminho: {self.app_pasta}" if self.lang == "pt" else f"Path: {self.app_pasta}", fg="white")
+        self.lbl_app_name.config(
+            text=f"Nome: {self.app_nome}" if self.lang == "pt" else f"Name: {self.app_nome}"
+        )
+        self.lbl_app_path.config(
+            text=f"Caminho: {self.app_pasta}" if self.lang == "pt" else f"Path: {self.app_pasta}",
+            fg=self.fg_color,       # was hardcoded "white"
+        )
         self.btn_uninstall.config(state="normal")
 
+    # ── Uninstall ─────────────────────────────────────────────────────────────
     def desinstalar(self):
         t = self.texts[self.lang]
-        
-        # Trava de Segurança Crítica: Impede de deletar /, /home, /mnt, etc.
+
+        # Critical safety lock: refuse to delete shallow paths like /mnt or /home
         caminho_seguro = Path(self.app_pasta)
         if len(caminho_seguro.parts) <= 3:
-            messagebox.showerror("Erro de Segurança / Security Error", "O diretório raiz é muito amplo para ser deletado por segurança (Ex: /mnt ou /home).")
+            messagebox.showerror(
+                "Erro de Segurança / Security Error",
+                "O diretório raiz é muito amplo para ser deletado por segurança (Ex: /mnt ou /home)."
+            )
             return
 
         resposta = messagebox.askyesno(t["warn_title"], t["warn_msg"].format(self.app_pasta), icon="warning")
-        
+
         if resposta:
             try:
-                # 1. Apaga a pasta do Windows App
+                # 1. Delete the Windows app folder
                 subprocess.run(['rm', '-rf', self.app_pasta])
-                
-                # 2. Apaga o arquivo selecionado (atalho ou .exe)
+
+                # 2. Delete the selected shortcut/exe
                 if os.path.exists(self.caminho_selecionado):
                     os.remove(self.caminho_selecionado)
-                
-                # 3. Limpeza Extrema: Varre o Menu Iniciar procurando atalhos com esse nome
-                pasta_menu = Path.home() / ".local" / "share" / "applications"
-                nome_busca = self.app_nome.lower().replace(" ", "")
-                
+
+                # 3. Sweep Start Menu for matching shortcuts
+                pasta_menu  = Path.home() / ".local" / "share" / "applications"
+                nome_busca  = self.app_nome.lower().replace(" ", "")
                 if pasta_menu.exists():
                     for arquivo in os.listdir(pasta_menu):
                         if arquivo.endswith(".desktop") and nome_busca in arquivo.lower().replace(" ", ""):
                             os.remove(pasta_menu / arquivo)
-                    
+
                 subprocess.run(['update-desktop-database', str(pasta_menu)], stderr=subprocess.DEVNULL)
-                
+
                 messagebox.showinfo(t["success_title"], t["success_msg"].format(self.app_nome))
-                
-                # Reset visual
+
+                # Reset UI
                 self.caminho_selecionado = ""
-                self.app_nome = ""
+                self.app_nome  = ""
                 self.app_pasta = ""
                 self.lbl_file.config(text=t["no_file"], fg=self.color_gray)
                 self.lbl_app_name.config(text=t["app_name"])
-                self.lbl_app_path.config(text=t["app_path"], fg="white")
+                self.lbl_app_path.config(text=t["app_path"], fg=self.fg_color)  # was "white"
                 self.btn_uninstall.config(state="disabled")
-                
+
             except Exception as e:
                 messagebox.showerror("Erro / Error", str(e))
+
 
 if __name__ == "__main__":
     root = tk.Tk()
